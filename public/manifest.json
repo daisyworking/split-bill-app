@@ -1,0 +1,8 @@
+{
+  "short_name": "鼠團帳本",
+  "name": "老鼠分帳App",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#52B4CC",
+  "background_color": "#FCFCFC"
+}
