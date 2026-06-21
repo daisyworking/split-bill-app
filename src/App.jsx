@@ -35,31 +35,29 @@ const CURRENCY_OPTIONS = ['TWD', 'JPY', 'KRW', 'USD', 'EUR', 'GBP', 'THB', 'VND'
 // ==========================================
 // 輔助函式
 // ==========================================
+// 1. 改良：精準平分，保留小數點計算
 const calculateEqualSplits = (total, memberIds) => {
   if (!memberIds || memberIds.length === 0) return {};
-  const amount = Math.round(Number(total));
+  const amount = Number(total);
   if (isNaN(amount)) return {};
   
   const count = memberIds.length;
-  const base = Math.floor(amount / count);
-  let remainder = amount - (base * count);
+  const splitAmount = amount / count; // 直接相除，保留完整小數點
   
   const splits = {};
   memberIds.forEach((id) => {
-    if (remainder > 0) {
-      splits[id] = base + 1;
-      remainder--;
-    } else {
-      splits[id] = base;
-    }
+    // 保留小數點後 4 位，避免 JavaScript 浮點數運算誤差
+    splits[id] = Number(splitAmount.toFixed(4));
   });
   return splits;
 };
 
-const formatMoney = (amount, showDecimals = false) => {
+// 2. 改良：動態顯示小數點。如果數字本身帶有小數，就強制顯示兩位小數
+const formatMoney = (amount, forceDecimals = false) => {
+  const hasDecimals = forceDecimals || (amount % 1 !== 0);
   return new Intl.NumberFormat('zh-TW', { 
-    maximumFractionDigits: showDecimals ? 2 : 0,
-    minimumFractionDigits: showDecimals ? 2 : 0 
+    maximumFractionDigits: hasDecimals ? 2 : 0,
+    minimumFractionDigits: hasDecimals ? 2 : 0 
   }).format(amount);
 };
 
@@ -126,7 +124,6 @@ export default function App() {
     const projectsRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'projects');
     const unsubProjects = onSnapshot(projectsRef, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // 確保最新的專案在最上面，越舊的在越下面
       setProjects(data.sort((a, b) => b.createdAt - a.createdAt));
     });
 
@@ -144,7 +141,6 @@ export default function App() {
   const currentProject = projects.find(p => p.id === currentProjectId);
   const projectExpenses = expenses.filter(e => e.projectId === currentProjectId);
 
-  // 這裡是最外層的容器，設定為螢幕高度(100dvh)、不可左右滑動(overflow-hidden)
   return (
     <div className="max-w-md w-full mx-auto bg-[#FCFCFC] h-[100dvh] flex flex-col relative font-sans text-gray-800 overflow-hidden shadow-xl">
       {currentView === 'home' && (
@@ -192,7 +188,7 @@ function HomeView({ projects, onOpenProject, onManageMembers, deferredPrompt, se
         ratesMode: 'unified',
         rates: {}, 
         showDecimals: false,
-        isSettled: false, // 新增已結清狀態
+        isSettled: false, 
         createdAt: Date.now()
       });
       setNewProjectName('');
@@ -203,7 +199,6 @@ function HomeView({ projects, onOpenProject, onManageMembers, deferredPrompt, se
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#FCFCFC]">
-      {/* 頂部固定區塊 */}
       <div className="flex-shrink-0 p-4 flex justify-between items-center bg-[#FCFCFC] z-10">
         <h1 className="text-2xl font-bold text-[#52B4CC] flex items-center gap-2">
           <Wallet size={28} /> 老鼠團分帳本
@@ -213,9 +208,7 @@ function HomeView({ projects, onOpenProject, onManageMembers, deferredPrompt, se
         </button>
       </div>
 
-      {/* 中間滑動內容區塊 */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
-        {/* PWA 提示 */}
         {!isStandalone && (deferredPrompt || (isIOS && !showIOSPrompt)) && (
           <div className="bg-white p-4 rounded-xl shadow-sm border border-[#C5E6EE] flex justify-between items-center">
             <div>
@@ -242,7 +235,6 @@ function HomeView({ projects, onOpenProject, onManageMembers, deferredPrompt, se
           </div>
         )}
 
-        {/* 專案列表 */}
         {projects.length === 0 ? (
           <div className="text-center text-[#8BCDDD] mt-10">
             <Receipt size={48} className="mx-auto mb-2 opacity-50" />
@@ -272,7 +264,6 @@ function HomeView({ projects, onOpenProject, onManageMembers, deferredPrompt, se
         )}
       </div>
 
-      {/* 底部固定建立按鈕區塊 */}
       <div className="flex-shrink-0 p-4 bg-white border-t border-gray-100 z-10 pb-safe">
         {showCreate ? (
           <div className="flex flex-col gap-3">
@@ -332,7 +323,7 @@ function MembersView({ members, onBack }) {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#FCFCFC]">
       <div className="flex-shrink-0 bg-white p-4 shadow-sm flex items-center gap-3 z-10 border-b border-gray-100">
         <button onClick={onBack} className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-600"><ArrowLeft size={24} /></button>
-        <h2 className="text-xl font-bold text-gray-800">成員管理</h2>
+        <h2 className="text-xl font-bold text-gray-800">全域成員管理</h2>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-safe">
@@ -395,7 +386,6 @@ function ProjectView({ project, expenses, globalMembers, onBack }) {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#FCFCFC]">
-      {/* 專案頂部固定列 */}
       <div className="flex-shrink-0 bg-[#52B4CC] text-white p-4 flex items-center gap-3 shadow-md z-20">
         <button onClick={onBack} className="p-2 -ml-2 rounded-full hover:bg-[#3FA1B8]">
           <ArrowLeft size={24} />
@@ -404,7 +394,6 @@ function ProjectView({ project, expenses, globalMembers, onBack }) {
         {project.isSettled && <span className="text-xs bg-white text-[#52B4CC] px-2 py-1 rounded-full font-bold shadow-sm">已結清</span>}
       </div>
 
-      {/* 中間內容區 (可滑動) */}
       <div className="flex-1 overflow-y-auto">
         {tab === 'list' && <ExpenseList project={project} expenses={expenses} members={projectMembers} onEdit={handleEditExpense} />}
         {tab === 'add' && <ExpenseForm project={project} members={projectMembers} initialData={editingExpense} onSuccess={() => { setTab('list'); setEditingExpense(null); }} onCancel={() => { setTab('list'); setEditingExpense(null); }} />}
@@ -412,7 +401,6 @@ function ProjectView({ project, expenses, globalMembers, onBack }) {
         {tab === 'settings' && <ProjectSettings project={project} globalMembers={globalMembers} onBack={onBack} />}
       </div>
 
-      {/* 底部導覽列 (固定) */}
       <div className="flex-shrink-0 bg-white border-t border-gray-200 flex justify-around p-2 pb-safe z-20 shadow-[0_-4px_10px_-1px_rgba(0,0,0,0.05)]">
         <TabButton icon={<Receipt />} label="紀錄" active={tab === 'list'} onClick={() => { setTab('list'); setEditingExpense(null); }} />
         <TabButton icon={<Plus />} label="記一筆" active={tab === 'add'} onClick={() => { setTab('add'); setEditingExpense(null); }} className="bg-[#FCFCFC] text-[#52B4CC] rounded-xl border border-[#C5E6EE] shadow-sm my-1" />
@@ -469,12 +457,12 @@ function ProjectSettings({ project, globalMembers, onBack }) {
   const handleDeleteProject = async () => {
     try {
       await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'projects', project.id));
-      onBack(); // 刪除後返回首頁
+      onBack(); 
     } catch(e) { console.error(e); }
   };
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 pb-24">
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
         <h3 className="text-gray-500 text-sm mb-2 font-bold">專案名稱</h3>
         <div className="flex gap-2">
@@ -493,8 +481,8 @@ function ProjectSettings({ project, globalMembers, onBack }) {
 
       <div className="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center cursor-pointer border border-gray-100" onClick={handleToggleDecimals}>
         <div>
-          <h3 className="font-bold text-gray-700">顯示小數點</h3>
-          <p className="text-xs text-gray-500 mt-1">台幣、日幣建議關閉，維持整數</p>
+          <h3 className="font-bold text-gray-700">顯示小數點 (結算仍會四捨五入)</h3>
+          <p className="text-xs text-gray-500 mt-1">強制在所有畫面顯示小數點</p>
         </div>
         <input type="checkbox" checked={showDecimals} readOnly className="w-6 h-6 text-[#52B4CC] rounded accent-[#52B4CC]" />
       </div>
@@ -528,7 +516,6 @@ function ProjectSettings({ project, globalMembers, onBack }) {
         </div>
       </div>
 
-      {/* 刪除專案區塊 */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-red-100 mt-8 mb-4">
         <h3 className="text-red-500 text-sm mb-2 font-bold">危險區域</h3>
         {confirmDelete ? (
@@ -626,8 +613,7 @@ function ExpenseForm({ project, members, initialData, onSuccess, onCancel }) {
   if (members.length === 0) return <div className="p-8 text-center text-[#8BCDDD] font-bold">請先到「設定」頁面勾選參與成員！</div>;
 
   return (
-    <div className="p-4 space-y-4 animate-in fade-in pb-4">
-      {/* 拿掉最上面的標題區塊，直接顯示表單內容 */}
+    <div className="p-4 space-y-4 animate-in fade-in pb-24">
       <div className="bg-white p-4 rounded-xl shadow-sm space-y-4 border border-gray-100">
         <div className="flex gap-3">
           <div className="w-1/3">
@@ -688,7 +674,10 @@ function ExpenseForm({ project, members, initialData, onSuccess, onCancel }) {
             {totalAmount > 0 && selectedSplitters.length > 0 && (
               <div className="mt-4 p-3 bg-[#FCFCFC] border border-[#C5E6EE] rounded-lg text-sm text-[#3B93A8] flex justify-between">
                 <span className="font-medium">每人約負擔：</span>
-                <span className="font-bold text-lg">{formatMoney(Math.floor(totalAmount/selectedSplitters.length), project.showDecimals)}</span>
+                {/* 預覽時自動判斷是否該顯示小數點 */}
+                <span className="font-bold text-lg">
+                  {formatMoney(totalAmount/selectedSplitters.length, (totalAmount/selectedSplitters.length) % 1 !== 0)}
+                </span>
               </div>
             )}
           </div>
@@ -706,14 +695,13 @@ function ExpenseForm({ project, members, initialData, onSuccess, onCancel }) {
             {members.map(m => (
               <div key={m.id} className="flex items-center gap-3 bg-gray-50 p-1.5 rounded-lg border border-gray-100">
                 <span className="w-16 font-bold text-gray-700 ml-2">{m.name}</span>
-                <input type="number" placeholder="0" value={unequalSplits[m.id] || ''} onChange={e => setUnequalSplits({...unequalSplits, [m.id]: e.target.value})} className="flex-1 border p-2 rounded outline-none font-bold text-[#3B93A8]" />
+                <input type="number" step="0.01" placeholder="0" value={unequalSplits[m.id] || ''} onChange={e => setUnequalSplits({...unequalSplits, [m.id]: e.target.value})} className="flex-1 border p-2 rounded outline-none font-bold text-[#3B93A8]" />
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* 判斷是編輯還是新增，顯示不同的按鈕 */}
       {initialData ? (
         <div className="flex gap-3 pt-2">
           <button onClick={onCancel} className="flex-1 bg-white border-2 border-gray-200 text-gray-600 p-4 rounded-xl font-bold text-lg hover:bg-gray-50 transition-colors shadow-sm">
@@ -766,7 +754,7 @@ function ExpenseList({ project, expenses, members, onEdit }) {
   );
 
   return (
-    <div className="p-4">
+    <div className="p-4 pb-24">
       <div className="mb-4 bg-white p-2 rounded-xl shadow-sm flex items-center gap-2 border border-gray-100 sticky top-0 z-10">
         <Users size={18} className="text-[#8BCDDD] ml-2" />
         <select value={filterMemberId} onChange={e=>setFilterMemberId(e.target.value)} className="flex-1 bg-transparent outline-none p-1 font-bold text-[#3B93A8]">
@@ -807,7 +795,10 @@ function ExpenseList({ project, expenses, members, onEdit }) {
                       </div>
                     </div>
                     <div className="text-right flex flex-col items-end ml-2 flex-shrink-0">
-                      <span className="font-bold text-lg text-[#3B93A8]">{exp.currency} {formatMoney(exp.totalAmount, project.showDecimals)}</span>
+                      {/* 自動判斷總金額是否有小數點並顯示 */}
+                      <span className="font-bold text-lg text-[#3B93A8]">
+                        {exp.currency} {formatMoney(exp.totalAmount, project.showDecimals || exp.totalAmount % 1 !== 0)}
+                      </span>
                       <ChevronDown size={18} className={`text-[#8BCDDD] mt-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                     </div>
                   </div>
@@ -817,12 +808,14 @@ function ExpenseList({ project, expenses, members, onEdit }) {
                       {!exp.isPersonal && (
                         <div className="mb-4">
                           <p className="font-bold text-[#8BCDDD] mb-2 border-b border-[#C5E6EE] pb-1">分攤明細</p>
-                          {/* 這裡修復了黑線問題，加上了明確的淺灰框線 */}
                           <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                             {Object.entries(exp.splits).map(([uid, amt]) => (
                               <div key={uid} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
                                 <span className="font-bold text-gray-700">{getMemberName(uid)}</span>
-                                <span className="text-[#52B4CC] font-bold">{formatMoney(amt, project.showDecimals)}</span>
+                                {/* 自動判斷分攤金額是否有小數點並顯示 */}
+                                <span className="text-[#52B4CC] font-bold">
+                                  {formatMoney(amt, project.showDecimals || amt % 1 !== 0)}
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -858,7 +851,7 @@ function ExpenseList({ project, expenses, members, onEdit }) {
 }
 
 // ==========================================
-// 結算 Tab
+// 結算 Tab (完美會計平衡演算法)
 // ==========================================
 function SettlementView({ project, expenses, members }) {
   const [ratesMode, setRatesMode] = useState(project.ratesMode || 'unified');
@@ -889,34 +882,65 @@ function SettlementView({ project, expenses, members }) {
   };
 
   const settlementData = useMemo(() => {
-    const balances = {}; const personalTotals = {}; 
-    members.forEach(m => { balances[m.id] = 0; personalTotals[m.id] = 0; });
+    const exactBalances = {}; 
+    const exactPersonalTotals = {}; 
+    members.forEach(m => { exactBalances[m.id] = 0; exactPersonalTotals[m.id] = 0; });
 
+    // 1. 使用「精準小數點」計算所有人餘額
     expenses.forEach(exp => {
       let rate = 1;
       if (exp.currency !== 'TWD') {
         rate = ratesMode === 'unified' ? (rates[exp.currency] || 1) : (rates[`${exp.date}_${exp.currency}`] || rates[exp.currency] || 1);
       }
       const totalTWD = exp.totalAmount * rate;
-      if (balances[exp.payerId] !== undefined) balances[exp.payerId] += totalTWD;
+      if (exactBalances[exp.payerId] !== undefined) exactBalances[exp.payerId] += totalTWD;
+      
       Object.entries(exp.splits).forEach(([uid, amt]) => {
-        if (balances[uid] !== undefined) { const amtTWD = amt * rate; balances[uid] -= amtTWD; personalTotals[uid] += amtTWD; }
+        if (exactBalances[uid] !== undefined) { 
+          const amtTWD = amt * rate; 
+          exactBalances[uid] -= amtTWD; 
+          exactPersonalTotals[uid] += amtTWD; 
+        }
       });
     });
 
+    // 2. 將精準餘額「四捨五入」，並觸發會計防呆機制 (確保加總為 0)
+    const balances = {};
+    const personalTotals = {};
+    let sum = 0;
+    let maxAbsId = null;
+    let maxAbs = -1;
+
+    members.forEach(m => {
+      const roundedBalance = Math.round(exactBalances[m.id] || 0);
+      balances[m.id] = roundedBalance;
+      personalTotals[m.id] = Math.round(exactPersonalTotals[m.id] || 0); // 總花費四捨五入
+      sum += roundedBalance;
+      if (Math.abs(roundedBalance) > maxAbs) {
+        maxAbs = Math.abs(roundedBalance);
+        maxAbsId = m.id;
+      }
+    });
+
+    // 3. 如果四捨五入後總和不是 0，微調餘額最大的人來補平這 1 塊錢
+    if (sum !== 0 && maxAbsId) {
+      balances[maxAbsId] -= sum;
+    }
+
+    // 4. 計算最佳轉帳路徑 (現在都是完美的整數了！)
     const debtors = []; const creditors = [];
     Object.entries(balances).forEach(([id, amt]) => {
-      if (amt < -0.5) debtors.push({ id, amount: Math.abs(amt) });
-      else if (amt > 0.5) creditors.push({ id, amount: amt });
+      if (amt < 0) debtors.push({ id, amount: Math.abs(amt) });
+      else if (amt > 0) creditors.push({ id, amount: amt });
     });
     debtors.sort((a,b) => b.amount - a.amount); creditors.sort((a,b) => b.amount - a.amount);
 
     const transfers = []; let d = 0, c = 0;
     while (d < debtors.length && c < creditors.length) {
       const minAmount = Math.min(debtors[d].amount, creditors[c].amount);
-      if (minAmount > 0.5) transfers.push({ from: debtors[d].id, to: creditors[c].id, amount: Math.round(minAmount) });
+      if (minAmount > 0) transfers.push({ from: debtors[d].id, to: creditors[c].id, amount: minAmount });
       debtors[d].amount -= minAmount; creditors[c].amount -= minAmount;
-      if (debtors[d].amount < 0.5) d++; if (creditors[c].amount < 0.5) c++;
+      if (debtors[d].amount === 0) d++; if (creditors[c].amount === 0) c++;
     }
     return { balances, personalTotals, transfers };
   }, [expenses, rates, ratesMode, members]);
@@ -930,7 +954,7 @@ function SettlementView({ project, expenses, members }) {
       let rate = 1;
       if (exp.currency !== 'TWD') rate = ratesMode === 'unified' ? (rates[exp.currency] || 1) : (rates[`${exp.date}_${exp.currency}`] || 1);
       const twdTotal = Math.round(exp.totalAmount * rate);
-      const noteField = exp.note ? `"${exp.note.replace(/"/g, '""')}"` : ''; // 將備註加入並防護逗號
+      const noteField = exp.note ? `"${exp.note.replace(/"/g, '""')}"` : ''; 
       const modeNote = exp.isPersonal ? '個人' : (exp.splitMode === 'equal' ? '平分' : '不平分');
       const details = Object.entries(exp.splits).map(([uid, amt]) => `${getMemberName(uid)}:${amt}`).join(';');
       csv += `${exp.date},${exp.title},${noteField},${payer},${exp.currency},${exp.totalAmount},${rate},${twdTotal},${modeNote},${details}\n`;
@@ -942,7 +966,7 @@ function SettlementView({ project, expenses, members }) {
   };
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 pb-24">
       {usedCurrencies.length > 0 && (
         <div className="bg-white p-4 rounded-xl shadow-sm border border-[#C5E6EE]">
           <div className="flex justify-between items-center mb-4">
@@ -980,7 +1004,8 @@ function SettlementView({ project, expenses, members }) {
                   <span className="text-[10px] text-[#3B93A8] font-bold mb-1">應轉帳給</span>
                   <div className="w-full relative flex items-center justify-center my-1">
                     <div className="absolute w-full h-px bg-[#8BCDDD]"></div>
-                    <div className="bg-white px-3 py-1 rounded-full font-bold text-[#52B4CC] text-lg border border-[#8BCDDD] z-10 whitespace-nowrap">NT$ {formatMoney(t.amount, project.showDecimals)}</div>
+                    {/* 這裡因為最後是強制顯示四捨五入的結算，所以 forceDecimals 設為 false */}
+                    <div className="bg-white px-3 py-1 rounded-full font-bold text-[#52B4CC] text-lg border border-[#8BCDDD] z-10 whitespace-nowrap">NT$ {formatMoney(t.amount, false)}</div>
                   </div>
                 </div>
                 <span className="font-bold text-green-500 w-16 text-center">{getMemberName(t.to)}</span>
@@ -997,15 +1022,16 @@ function SettlementView({ project, expenses, members }) {
         </div>
         <div className="space-y-1">
           {members.map(m => {
-            const balance = Math.round(settlementData.balances[m.id]); const isPos = balance > 0; const isNeg = balance < 0;
+            const balance = settlementData.balances[m.id]; 
+            const isPos = balance > 0; const isNeg = balance < 0;
             return (
               <div key={m.id} className="flex justify-between p-2 hover:bg-gray-50 rounded-lg">
                 <div>
                   <div className="font-bold text-gray-800 text-lg">{m.name}</div>
-                  <div className="text-xs text-gray-400 font-bold mt-0.5">總花費: <span className="text-gray-600">NT$ {formatMoney(settlementData.personalTotals[m.id], project.showDecimals)}</span></div>
+                  <div className="text-xs text-gray-400 font-bold mt-0.5">總花費: <span className="text-gray-600">NT$ {formatMoney(settlementData.personalTotals[m.id], false)}</span></div>
                 </div>
                 <div className="text-right">
-                  <div className={`font-bold text-xl ${isPos ? 'text-green-500' : isNeg ? 'text-red-500' : 'text-gray-400'}`}>{isPos ? '+' : ''}{formatMoney(balance, project.showDecimals)}</div>
+                  <div className={`font-bold text-xl ${isPos ? 'text-green-500' : isNeg ? 'text-red-500' : 'text-gray-400'}`}>{isPos ? '+' : ''}{formatMoney(balance, false)}</div>
                   <div className={`text-[11px] font-bold mt-0.5 ${isPos ? 'text-green-500/70' : isNeg ? 'text-red-500/70' : 'text-gray-400'}`}>{isPos ? '可收回' : isNeg ? '需付款' : '結清'}</div>
                 </div>
               </div>
