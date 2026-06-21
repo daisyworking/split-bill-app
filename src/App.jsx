@@ -1016,10 +1016,14 @@ function SettlementView({ project, expenses, members }) {
       </div>
 
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
+        <div className="flex justify-between items-center mb-1">
           <h3 className="font-bold text-gray-800 text-lg">成員淨額與總花費</h3>
           <button onClick={exportCSV} className="text-sm text-[#52B4CC] border border-[#C5E6EE] px-3 py-1.5 rounded-lg flex items-center gap-1 font-bold"><Download size={16}/> 匯出 CSV</button>
         </div>
+        {/* 在這裡新增小小的備註文字 */}
+        <p className="text-[11px] text-gray-400 mb-3 border-b border-gray-100 pb-3">
+          * 金額皆已四捨五入至整數
+        </p>
         <div className="space-y-1">
           {members.map(m => {
             const balance = settlementData.balances[m.id]; 
