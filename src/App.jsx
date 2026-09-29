@@ -83,7 +83,7 @@ function CalculatorModal({ initialValue, onClose, onConfirm }) {
   const handleConfirm = () => {
     if (calcResult !== '') onConfirm(calcResult);
     else if (expr === '') onConfirm('');
-    else onClose(); // 若算式錯誤且無結果，直接關閉
+    else onClose(); 
   };
 
   const buttons = [
@@ -105,14 +105,14 @@ function CalculatorModal({ initialValue, onClose, onConfirm }) {
             {calcResult !== '' && expr.match(/[+×÷\-]/) ? `= ${calcResult}` : (calcResult !== '' ? calcResult : '')}
           </div>
         </div>
-        {/* 鍵盤區域 */}
-        <div className="grid grid-cols-4 gap-3 relative">
+        {/* 鍵盤區域：移除了 relative，使用原生的 Grid 排版 */}
+        <div className="grid grid-cols-4 gap-3">
           {buttons.map(b => (
             <button 
               key={b} 
               onClick={() => handleBtn(b)} 
               className={`p-4 rounded-2xl text-2xl font-bold active:scale-95 transition-transform flex items-center justify-center
-              ${b === '=' ? 'bg-[#52B4CC] text-white shadow-md absolute right-0 bottom-0 h-[calc(50%-6px)] w-[calc(25%-9px)]' : 
+              ${b === '=' ? 'bg-[#52B4CC] text-white shadow-md row-span-2' : /* 👈 這裡改用了 row-span-2 讓等號自然跨兩列 */
                 ['C','⌫'].includes(b) ? 'bg-gray-100 text-gray-600' :
                 ['÷','×','-','+'].includes(b) ? 'bg-[#C5E6EE]/50 text-[#3B93A8]' : 
                 'bg-white border border-gray-100 text-gray-800 shadow-sm'}`}
